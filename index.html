@@ -222,15 +222,35 @@ function computeUniqueAirports(rows) {
 }
 
 function computeTopAirport(rows) {
-  const counts = new Map();
+  // Count each airport at most once per date
+  const counts = new Map();           // airport -> number of days it appears
+  const seenPerDay = new Set();       // `${date}|${airport}`
+
   for (const r of rows) {
-    if (r.from_iata) counts.set(r.from_iata, (counts.get(r.from_iata) || 0) + 1);
-    if (r.to_iata) counts.set(r.to_iata, (counts.get(r.to_iata) || 0) + 1);
+    const date = (r.date || '').trim();
+    if (!date) continue;
+
+    const airports = [];
+    if (r.from_iata) airports.push(r.from_iata);
+    if (r.to_iata) airports.push(r.to_iata);
+
+    for (const a of airports) {
+      const airport = (a || '').trim().toUpperCase();
+      if (!airport) continue;
+
+      const key = `${date}|${airport}`;
+      if (seenPerDay.has(key)) continue;
+
+      seenPerDay.add(key);
+      counts.set(airport, (counts.get(airport) || 0) + 1);
+    }
   }
+
   let best = null, bestN = 0;
   for (const [k, v] of counts.entries()) {
     if (v > bestN) { best = k; bestN = v; }
   }
+
   return best ? `${best} (${bestN})` : '–';
 }
   function addArrowAtMidpoint(latlngs, color) {
