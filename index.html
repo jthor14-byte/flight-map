@@ -175,7 +175,11 @@
     const end   = turf.point([toLng, toLat]);
 
     // 100 points gives smooth curves without being heavy
-    const gc = turf.greatCircle(start, end, { npoints: 100, properties: {} });
+    const gc = turf.greatCircle(start, end, {
+  npoints: 100,
+  properties: {},
+  antimeridian: true
+});
     const coords = gc.geometry.coordinates; // [ [lng,lat], ... ]
     return coords.map(([lng, lat]) => [lat, lng]);
   }
