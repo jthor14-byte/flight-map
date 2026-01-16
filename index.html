@@ -95,11 +95,14 @@
       </div>
 
       <div class="stats">
-        <div class="card"><div class="k">Flights</div><div class="v" id="sFlights">–</div></div>
-        <div class="card"><div class="k">Distance (km)</div><div class="v" id="sKm">–</div></div>
-        <div class="card"><div class="k">Est. hours</div><div class="v" id="sHours">–</div></div>
-        <div class="card"><div class="k">Top route</div><div class="v" id="sTopRoute">–</div></div>
-      </div>
+  <div class="card"><div class="k">Flights</div><div class="v" id="sFlights">–</div></div>
+  <div class="card"><div class="k">Distance (km)</div><div class="v" id="sKm">–</div></div>
+  <div class="card"><div class="k">Est. hours</div><div class="v" id="sHours">–</div></div>
+  <div class="card"><div class="k">Top route</div><div class="v" id="sTopRoute">–</div></div>
+
+  <div class="card"><div class="k">Airports visited</div><div class="v" id="sAirports">–</div></div>
+  <div class="card"><div class="k">Most visited airport</div><div class="v" id="sTopAirport">–</div></div>
+</div>
 
       <div id="err" class="row error"></div>
 
@@ -190,7 +193,27 @@
     }
     return best ? `${best} (${bestN})` : '–';
   }
+function computeUniqueAirports(rows) {
+  const s = new Set();
+  for (const r of rows) {
+    if (r.from_iata) s.add(r.from_iata);
+    if (r.to_iata) s.add(r.to_iata);
+  }
+  return s.size;
+}
 
+function computeTopAirport(rows) {
+  const counts = new Map();
+  for (const r of rows) {
+    if (r.from_iata) counts.set(r.from_iata, (counts.get(r.from_iata) || 0) + 1);
+    if (r.to_iata) counts.set(r.to_iata, (counts.get(r.to_iata) || 0) + 1);
+  }
+  let best = null, bestN = 0;
+  for (const [k, v] of counts.entries()) {
+    if (v > bestN) { best = k; bestN = v; }
+  }
+  return best ? `${best} (${bestN})` : '–';
+}
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
   const loadBtn = document.getElementById('loadBtn');
@@ -265,7 +288,8 @@ for (const y of years) {
     document.getElementById('sKm').textContent = km ? fmt(km) : '0';
     document.getElementById('sHours').textContent = hours ? fmt(hours) : '0';
     document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
-
+    document.getElementById('sAirports').textContent = fmt(computeUniqueAirports(rows));
+    document.getElementById('sTopAirport').textContent = computeTopAirport(rows);
     if (!rows.length) return;
 
     // Render routes + markers
