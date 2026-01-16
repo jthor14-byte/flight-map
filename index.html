@@ -109,8 +109,13 @@
   <div class="card"><div class="k">Airports visited</div><div class="v" id="sAirports">–</div></div>
   <div class="card"><div class="k">Most visited airport</div><div class="v" id="sTopAirport">–</div></div>
 </div>
+      <div class="card"><div class="k">Est. time at airport (hrs)</div><div class="v" id="sAirportHours">–</div></div>
 
       <div id="err" class="row error"></div>
+      <div class="row">
+  <label>Airport</label>
+  <select id="airportSelect" disabled></select>
+</div>
       <div class="row">
   <label>Countries visited (filtered)</label>
   <div id="flags" style="font-size: 22px; line-height: 28px; word-wrap: break-word;"></div>
@@ -154,6 +159,7 @@
     return m ? Number(m[1]) : null;
   };
   const fmt = (n) => new Intl.NumberFormat().format(n);
+  const AVG_AIRPORT_HOURS_PER_MENTION = 2.5;
 
   function clearLayers() {
     routeLayer.clearLayers();
@@ -220,7 +226,19 @@ function computeUniqueAirports(rows) {
   }
   return s.size;
 }
-
+function computeAirportMentions(rows, airport) {
+  let mentions = 0;
+  for (const r of rows) {
+    if (!airport) {
+      if (r.from_iata) mentions += 1;
+      if (r.to_iata) mentions += 1;
+    } else {
+      if (r.from_iata === airport) mentions += 1;
+      if (r.to_iata === airport) mentions += 1;
+    }
+  }
+  return mentions;
+}
 function computeTopAirport(rows) {
   // Count each airport at most once per date
   const counts = new Map();           // airport -> number of days it appears
@@ -311,6 +329,7 @@ function computeCountryFlags(rows) {
   const resetBtn = document.getElementById('resetBtn');
   const yearSel = document.getElementById('yearSelect');
   const airlineSel = document.getElementById('airlineSelect');
+  const airportSel = document.getElementById('airportSelect');
 
   let allRows = [];
 
@@ -355,6 +374,28 @@ for (const y of years) {
     yearSel.disabled = false;
     airlineSel.disabled = false;
   }
+  // Airports
+const airportsSet = new Set();
+for (const r of rows) {
+  if (r.from_iata) airportsSet.add(r.from_iata);
+  if (r.to_iata) airportsSet.add(r.to_iata);
+}
+const airports = Array.from(airportsSet).sort((a,b) => a.localeCompare(b));
+
+airportSel.innerHTML = '';
+const allAirportsOpt = document.createElement('option');
+allAirportsOpt.value = '';
+allAirportsOpt.textContent = 'All airports';
+airportSel.appendChild(allAirportsOpt);
+
+for (const a of airports) {
+  const opt = document.createElement('option');
+  opt.value = a;
+  opt.textContent = a;
+  airportSel.appendChild(opt);
+}
+
+airportSel.disabled = false;
 
   function applyFiltersAndRender() {
     clearLayers();
@@ -362,12 +403,14 @@ for (const y of years) {
 
     const y = Number(yearSel.value || 0);
     const airline = (airlineSel.value || '').trim();
+    const airport = (airportSel.value || '').trim();
 
-    const rows = allRows.filter(r => {
-      if (y && r.year !== y) return false;
-      if (airline && (r.airline || '').trim() !== airline) return false;
-      return true;
-    });
+const rows = allRows.filter(r => {
+  if (y && r.year !== y) return false;
+  if (airline && (r.airline || '').trim() !== airline) return false;
+  if (airport && r.from_iata !== airport && r.to_iata !== airport) return false;
+  return true;
+});
 
     // Stats
     const flights = rows.length;
@@ -375,6 +418,9 @@ for (const y of years) {
     const mins = rows.reduce((acc, r) => acc + (r.est_duration_min || 0), 0);
     const hours = Math.round((mins / 60) * 10) / 10;
     const flags = computeCountryFlags(rows);
+    const mentions = computeAirportMentions(rows, airport);
+const airportHours = Math.round((mentions * AVG_AIRPORT_HOURS_PER_MENTION) * 10) / 10;
+document.getElementById('sAirportHours').textContent = fmt(airportHours);
 document.getElementById('flags').textContent = flags.join(' ');
 
     document.getElementById('sFlights').textContent = flights ? fmt(flights) : '0';
@@ -519,6 +565,7 @@ const to_country_code   = (obj['to_country_code'] ?? '').toString().trim().toUpp
   resetBtn.addEventListener('click', resetView);
   yearSel.addEventListener('change', applyFiltersAndRender);
   airlineSel.addEventListener('change', applyFiltersAndRender);
+  airportSel.addEventListener('change', applyFiltersAndRender);
 
   // Try loading immediately if a URL is already pasted
   // (Handy once you’ve set it up.)
