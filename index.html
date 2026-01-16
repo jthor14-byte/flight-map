@@ -310,23 +310,25 @@ for (const y of years) {
 
       const segments = greatCircleSegments(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
 
-      const color = getColorForAirline(r.airline);
-   for (const latlngs of segments) {
+     const color = getColorForAirline(r.airline);
+
+const popup = `
+  <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
+  ${r.date || ''}<br/>
+  ${r.from_iata || ''} → ${r.to_iata || ''}<br/>
+  ${r.distance_km ? `${Math.round(r.distance_km)} km` : ''} ${r.est_duration_min ? `• ~${Math.round(r.est_duration_min)} min` : ''}
+`;
+
+for (const latlngs of segments) {
   const poly = L.polyline(latlngs, {
     weight: 2,
     opacity: 0.8,
     noClip: true,
     ...(color ? { color } : {})
   }).addTo(routeLayer);
-}
 
-      const popup = `
-        <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
-        ${r.date || ''}<br/>
-        ${r.from_iata || ''} → ${r.to_iata || ''}<br/>
-        ${r.distance_km ? `${Math.round(r.distance_km)} km` : ''} ${r.est_duration_min ? `• ~${Math.round(r.est_duration_min)} min` : ''}
-      `;
-      poly.bindPopup(popup);
+  poly.bindPopup(popup);
+}
 
       bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
 
