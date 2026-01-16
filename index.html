@@ -108,9 +108,8 @@
 
   <div class="card"><div class="k">Airports visited</div><div class="v" id="sAirports">–</div></div>
   <div class="card"><div class="k">Most visited airport</div><div class="v" id="sTopAirport">–</div></div>
+<div class="card"><div class="k">Est. time at airport (hrs)</div><div class="v" id="sAirportHours">–</div></div>
 </div>
-      <div class="card"><div class="k">Est. time at airport (hrs)</div><div class="v" id="sAirportHours">–</div></div>
-
       <div id="err" class="row error"></div>
       <div class="row">
   <label>Airport</label>
@@ -373,7 +372,7 @@ for (const y of years) {
 
     yearSel.disabled = false;
     airlineSel.disabled = false;
-  }
+  
   // Airports
 const airportsSet = new Set();
 for (const r of rows) {
@@ -396,7 +395,7 @@ for (const a of airports) {
 }
 
 airportSel.disabled = false;
-
+}
   function applyFiltersAndRender() {
     clearLayers();
     setError('');
