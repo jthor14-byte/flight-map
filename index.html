@@ -361,7 +361,7 @@
   header: true,
   skipEmptyLines: true,
   delimitersToGuess: [",", "\t", ";", "|"],
-  complete: ... (results) => {
+  complete: (results) => {
         try {
           const parsed = parseFlights(results.data || []);
           if (!parsed.length) {
