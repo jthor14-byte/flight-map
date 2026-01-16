@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flight Map</title>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- CSV parser -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- Turf.js for great-circle paths -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    #app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
+    #sidebar { padding: 14px 14px 10px; border-right: 1px solid #e6e6e6; overflow: auto; }
+    #map { height: 100%; }
+
+    h1 { font-size: 18px; margin: 0 0 10px; }
+    .row { margin: 10px 0; }
+    label { display: block; font-size: 12px; color: #444; margin-bottom: 6px; }
+    select, input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .card {
+      border: 1px solid #eee;
+      border-radius: 14px;
+      padding: 10px;
+    }
+    .card .k { font-size: 11px; color: #666; }
+    .card .v { font-size: 18px; font-weight: 650; margin-top: 4px; }
+    .small { font-size: 12px; color: #666; margin-top: 10px; line-height: 1.35; }
+    .error { color: #b00020; font-size: 13px; white-space: pre-wrap; }
+    .btnrow { display: flex; gap: 10px; margin-top: 10px; }
+    button {
+      flex: 1;
+      border: 1px solid #ddd;
+      background: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #fafafa; }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <h1>Flight Map</h1>
+
+      <div class="row">
+        <label>Google Sheets CSV URL</label>
+        <input id="csvUrl" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQuPdIajrcLWbRa2toJZUhscpdP-b2QaxzlkWvsCxcDu2r67cPXZyWmQmyIZdFxaQ/pubhtml" />
+        <div class="btnrow">
+          <button id="loadBtn">Load</button>
+          <button id="resetBtn">Reset view</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Year (defaults to latest)</label>
+        <select id="yearSelect" disabled></select>
+      </div>
+
+      <div class="row">
+        <label>Airline</label>
+        <select id="airlineSelect" disabled></select>
+      </div>
+
+      <div class="stats">
+        <div class="card"><div class="k">Flights</div><div class="v" id="sFlights">–</div></div>
+        <div class="card"><div class="k">Distance (km)</div><div class="v" id="sKm">–</div></div>
+        <div class="card"><div class="k">Est. hours</div><div class="v" id="sHours">–</div></div>
+        <div class="card"><div class="k">Top route</div><div class="v" id="sTopRoute">–</div></div>
+      </div>
+
+      <div id="err" class="row error"></div>
+
+      <div class="small">
+        Notes:
+        <ul>
+          <li>Uses your sheet’s <code>from_lat/from_lng</code> and <code>to_lat/to_lng</code> columns.</li>
+          <li>Routes are drawn as great-circle lines (approx) using Turf.</li>
+          <li>If you open this file directly (file://), some browsers block fetch. Use a simple local server or GitHub Pages.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+<script>
+  // ---------- Map setup ----------
+  const map = L.map('map', { worldCopyJump: true }).setView([20, 0], 2);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 8,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const routeLayer = L.layerGroup().addTo(map);
+  const markerLayer = L.layerGroup().addTo(map);
+
+  // ---------- Helpers ----------
+  const normKey = (s) => (s ?? '').toString().trim().toLowerCase();
+  const num = (x) => {
+    const n = Number((x ?? '').toString().trim());
+    return Number.isFinite(n) ? n : null;
+  };
+  const parseYear = (dateStr) => {
+    // expects YYYY-MM-DD or ISO-ish
+    const s = (dateStr ?? '').toString().trim();
+    const m = s.match(/^(\d{4})/);
+    return m ? Number(m[1]) : null;
+  };
+  const fmt = (n) => new Intl.NumberFormat().format(n);
+
+  function clearLayers() {
+    routeLayer.clearLayers();
+    markerLayer.clearLayers();
+  }
+
+  function setError(msg) {
+    document.getElementById('err').textContent = msg || '';
+  }
+
+  function resetView() {
+    map.setView([20, 0], 2);
+  }
+
+  function getColorForAirline(name) {
+    // deterministic-ish without picking explicit colors:
+    // Leaflet will use default polyline color if we omit; but to visually separate airlines,
+    // we derive a hue and use HSL. If you’d rather avoid colors entirely, set `return null;`
+    if (!name) return null;
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    const hue = h % 360;
+    return `hsl(${hue} 65% 45%)`;
+  }
+
+  function greatCircleLatLngs(fromLat, fromLng, toLat, toLng) {
+    // Turf expects [lng, lat]
+    const start = turf.point([fromLng, fromLat]);
+    const end   = turf.point([toLng, toLat]);
+
+    // 100 points gives smooth curves without being heavy
+    const gc = turf.greatCircle(start, end, { npoints: 100, properties: {} });
+    const coords = gc.geometry.coordinates; // [ [lng,lat], ... ]
+    return coords.map(([lng, lat]) => [lat, lng]);
+  }
+
+  function computeTopRoute(rows) {
+    const counts = new Map();
+    for (const r of rows) {
+      const route = r.route || `${r.from_iata || ''}–${r.to_iata || ''}`;
+      if (!route.trim()) continue;
+      counts.set(route, (counts.get(route) || 0) + 1);
+    }
+    let best = null, bestN = 0;
+    for (const [k, v] of counts.entries()) {
+      if (v > bestN) { best = k; bestN = v; }
+    }
+    return best ? `${best} (${bestN})` : '–';
+  }
+
+  // ---------- UI ----------
+  const csvUrlEl = document.getElementById('csvUrl');
+  const loadBtn = document.getElementById('loadBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const yearSel = document.getElementById('yearSelect');
+  const airlineSel = document.getElementById('airlineSelect');
+
+  let allRows = [];
+
+  function populateFilters(rows) {
+    // Years
+    const years = Array.from(new Set(rows.map(r => r.year).filter(y => y))).sort((a,b) => a-b);
+    yearSel.innerHTML = '';
+    for (const y of years) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      yearSel.appendChild(opt);
+    }
+
+    // Default to latest year
+    const latest = years.length ? years[years.length - 1] : null;
+    if (latest) yearSel.value = String(latest);
+
+    // Airlines
+    const airlines = Array.from(new Set(rows.map(r => (r.airline || '').trim()).filter(Boolean))).sort((a,b) => a.localeCompare(b));
+    airlineSel.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'All airlines';
+    airlineSel.appendChild(allOpt);
+
+    for (const a of airlines) {
+      const opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = a;
+      airlineSel.appendChild(opt);
+    }
+
+    yearSel.disabled = false;
+    airlineSel.disabled = false;
+  }
+
+  function applyFiltersAndRender() {
+    clearLayers();
+    setError('');
+
+    const y = Number(yearSel.value || 0);
+    const airline = (airlineSel.value || '').trim();
+
+    const rows = allRows.filter(r => {
+      if (y && r.year !== y) return false;
+      if (airline && (r.airline || '').trim() !== airline) return false;
+      return true;
+    });
+
+    // Stats
+    const flights = rows.length;
+    const km = Math.round(rows.reduce((acc, r) => acc + (r.distance_km || 0), 0));
+    const mins = rows.reduce((acc, r) => acc + (r.est_duration_min || 0), 0);
+    const hours = Math.round((mins / 60) * 10) / 10;
+
+    document.getElementById('sFlights').textContent = flights ? fmt(flights) : '0';
+    document.getElementById('sKm').textContent = km ? fmt(km) : '0';
+    document.getElementById('sHours').textContent = hours ? fmt(hours) : '0';
+    document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
+
+    if (!rows.length) return;
+
+    // Render routes + markers
+    const bounds = [];
+    const airportSeen = new Set();
+
+    for (const r of rows) {
+      if (r.from_lat == null || r.from_lng == null || r.to_lat == null || r.to_lng == null) continue;
+
+      const latlngs = greatCircleLatLngs(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
+
+      const color = getColorForAirline(r.airline);
+      const poly = L.polyline(latlngs, {
+        weight: 2,
+        opacity: 0.8,
+        ...(color ? { color } : {})
+      }).addTo(routeLayer);
+
+      const popup = `
+        <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
+        ${r.date || ''}<br/>
+        ${r.from_iata || ''} → ${r.to_iata || ''}<br/>
+        ${r.distance_km ? `${Math.round(r.distance_km)} km` : ''} ${r.est_duration_min ? `• ~${Math.round(r.est_duration_min)} min` : ''}
+      `;
+      poly.bindPopup(popup);
+
+      bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
+
+      // Markers (dedupe)
+      const fromKey = `F:${r.from_iata}:${r.from_lat}:${r.from_lng}`;
+      const toKey   = `T:${r.to_iata}:${r.to_lat}:${r.to_lng}`;
+
+      if (!airportSeen.has(fromKey)) {
+        airportSeen.add(fromKey);
+        L.circleMarker([r.from_lat, r.from_lng], { radius: 4 }).addTo(markerLayer)
+          .bindPopup(`<b>${r.from_iata || ''}</b><br/>Origin`);
+      }
+      if (!airportSeen.has(toKey)) {
+        airportSeen.add(toKey);
+        L.circleMarker([r.to_lat, r.to_lng], { radius: 4 }).addTo(markerLayer)
+          .bindPopup(`<b>${r.to_iata || ''}</b><br/>Destination`);
+      }
+    }
+
+    if (bounds.length) {
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+  }
+
+  function parseFlights(rawRows) {
+    // Map flexible header names to expected fields
+    const rows = [];
+    for (const rr of rawRows) {
+      const obj = {};
+      for (const k in rr) obj[normKey(k)] = rr[k];
+
+      const date = (obj['date'] ?? '').toString().trim();
+      const year = parseYear(date);
+
+      const flight_no = (obj['flight_no'] ?? obj['flight'] ?? '').toString().trim();
+      const airline = (obj['airline'] ?? '').toString().trim();
+      const from_iata = (obj['from_iata'] ?? obj['from'] ?? '').toString().trim().toUpperCase();
+      const to_iata = (obj['to_iata'] ?? obj['to'] ?? '').toString().trim().toUpperCase();
+
+      const from_lat = num(obj['from_lat']);
+      const from_lng = num(obj['from_lng']);
+      const to_lat = num(obj['to_lat']);
+      const to_lng = num(obj['to_lng']);
+
+      const distance_km = num(obj['distance_km']);
+      const est_duration_min = num(obj['est_duration_min']);
+
+      // Skip blank rows
+      if (!date && !flight_no && !from_iata && !to_iata) continue;
+
+      rows.push({
+        date, year,
+        flight_no, airline,
+        from_iata, to_iata,
+        from_lat, from_lng, to_lat, to_lng,
+        distance_km: distance_km || 0,
+        est_duration_min: est_duration_min || 0,
+        route: (obj['route'] ?? '').toString().trim()
+      });
+    }
+    return rows.filter(r => r.year); // keep rows with valid year for filtering
+  }
+
+  function loadCsv() {
+    setError('');
+    clearLayers();
+
+    const url = csvUrlEl.value.trim();
+    if (!url || url.includes('PASTE_YOUR_PUBLISHED_CSV_URL_HERE')) {
+      setError('Paste your published Google Sheets CSV URL first.');
+      return;
+    }
+
+    Papa.parse(url, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        try {
+          const parsed = parseFlights(results.data || []);
+          if (!parsed.length) {
+            setError('No rows found (or missing required columns). Check your published sheet and headers.');
+            return;
+          }
+          allRows = parsed;
+          populateFilters(allRows);
+
+          // Default: latest year (already selected), all airlines
+          applyFiltersAndRender();
+        } catch (e) {
+          setError('Failed to parse flights:\n' + (e?.message || e));
+        }
+      },
+      error: (err) => setError('CSV load error:\n' + (err?.message || err))
+    });
+  }
+
+  loadBtn.addEventListener('click', loadCsv);
+  resetBtn.addEventListener('click', resetView);
+  yearSel.addEventListener('change', applyFiltersAndRender);
+  airlineSel.addEventListener('change', applyFiltersAndRender);
+
+  // Try loading immediately if a URL is already pasted
+  // (Handy once you’ve set it up.)
+  // Comment out if you prefer manual load.
+  // loadCsv();
+</script>
+</body>
+</html>
