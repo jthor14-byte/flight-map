@@ -169,20 +169,25 @@
     return `hsl(${hue} 65% 45%)`;
   }
 
-  function greatCircleLatLngs(fromLat, fromLng, toLat, toLng) {
-    // Turf expects [lng, lat]
-    const start = turf.point([fromLng, fromLat]);
-    const end   = turf.point([toLng, toLat]);
+  function greatCircleSegments(fromLat, fromLng, toLat, toLng) {
+  const start = turf.point([fromLng, fromLat]);
+  const end   = turf.point([toLng, toLat]);
 
-    // 100 points gives smooth curves without being heavy
-    const gc = turf.greatCircle(start, end, {
-  npoints: 100,
-  properties: {},
-  antimeridian: true
-});
-    const coords = gc.geometry.coordinates; // [ [lng,lat], ... ]
-    return coords.map(([lng, lat]) => [lat, lng]);
-  }
+  const gc = turf.greatCircle(start, end, {
+    npoints: 100,
+    properties: {},
+    antimeridian: true
+  });
+
+  // Turf may return LineString OR MultiLineString when crossing the date line
+  const geom = gc.geometry;
+  const lines = (geom.type === "MultiLineString")
+    ? geom.coordinates
+    : [geom.coordinates];
+
+  // Convert each segment into Leaflet [lat,lng] points
+  return lines.map(line => line.map(([lng, lat]) => [lat, lng]));
+}
 
   function computeTopRoute(rows) {
     const counts = new Map();
@@ -303,14 +308,17 @@ for (const y of years) {
     for (const r of rows) {
       if (r.from_lat == null || r.from_lng == null || r.to_lat == null || r.to_lng == null) continue;
 
-      const latlngs = greatCircleLatLngs(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
+      const segments = greatCircleSegments(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
 
       const color = getColorForAirline(r.airline);
-      const poly = L.polyline(latlngs, {
-        weight: 2,
-        opacity: 0.8,
-        ...(color ? { color } : {})
-      }).addTo(routeLayer);
+   for (const latlngs of segments) {
+  const poly = L.polyline(latlngs, {
+    weight: 2,
+    opacity: 0.8,
+    noClip: true,
+    ...(color ? { color } : {})
+  }).addTo(routeLayer);
+}
 
       const popup = `
         <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
