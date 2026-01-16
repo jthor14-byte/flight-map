@@ -67,6 +67,12 @@
       cursor: pointer;
     }
     button:hover { background: #fafafa; }
+    .route-arrow {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 14px;
+  text-shadow: 0 0 2px white, 0 0 2px white;
+}
   </style>
 </head>
 
@@ -223,6 +229,34 @@ function computeTopAirport(rows) {
   }
   return best ? `${best} (${bestN})` : '–';
 }
+  function addArrowAtEnd(latlngs, color) {
+  if (!latlngs || latlngs.length < 2) return;
+
+  const end = latlngs[latlngs.length - 1];
+  const prev = latlngs[latlngs.length - 2];
+
+  // Calculate direction
+  const dy = end[0] - prev[0];
+  const dx = end[1] - prev[1];
+  const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+  const html = `
+    <div class="route-arrow"
+         style="color:${color || '#1f78b4'};
+                transform: translate(-7px, -7px) rotate(${angle}deg);">
+      ➤
+    </div>
+  `;
+
+  const icon = L.divIcon({
+    className: '',
+    html,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  });
+
+  L.marker(end, { icon, interactive: false }).addTo(markerLayer);
+}
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
   const loadBtn = document.getElementById('loadBtn');
@@ -309,6 +343,7 @@ for (const y of years) {
       if (r.from_lat == null || r.from_lng == null || r.to_lat == null || r.to_lng == null) continue;
 
       const segments = greatCircleSegments(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
+      const lastSegment = segments[segments.length - 1];
 
      const color = getColorForAirline(r.airline);
 
@@ -329,6 +364,7 @@ for (const latlngs of segments) {
 
   poly.bindPopup(popup);
 }
+      addArrowAtEnd(lastSegment, color);
 
       bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
 
