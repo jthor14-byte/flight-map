@@ -204,12 +204,20 @@
     // Years
     const years = Array.from(new Set(rows.map(r => r.year).filter(y => y))).sort((a,b) => a-b);
     yearSel.innerHTML = '';
-    for (const y of years) {
-      const opt = document.createElement('option');
-      opt.value = String(y);
-      opt.textContent = String(y);
-      yearSel.appendChild(opt);
-    }
+
+// All years option
+const allYearsOpt = document.createElement('option');
+allYearsOpt.value = '';
+allYearsOpt.textContent = 'All years';
+yearSel.appendChild(allYearsOpt);
+
+// Individual years
+for (const y of years) {
+  const opt = document.createElement('option');
+  opt.value = String(y);
+  opt.textContent = String(y);
+  yearSel.appendChild(opt);
+}
 
     // Default to latest year
     const latest = years.length ? years[years.length - 1] : null;
