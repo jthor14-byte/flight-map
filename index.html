@@ -229,15 +229,17 @@ function computeTopAirport(rows) {
   }
   return best ? `${best} (${bestN})` : '–';
 }
-  function addArrowAtEnd(latlngs, color) {
-  if (!latlngs || latlngs.length < 2) return;
+  function addArrowAtMidpoint(latlngs, color) {
+  if (!latlngs || latlngs.length < 3) return;
 
-  const end = latlngs[latlngs.length - 1];
-  const prev = latlngs[latlngs.length - 2];
+  const mid = Math.floor(latlngs.length / 2);
+  const prev = latlngs[mid - 1];
+  const curr = latlngs[mid];
+  const next = latlngs[mid + 1];
 
-  // Calculate direction
-  const dy = end[0] - prev[0];
-  const dx = end[1] - prev[1];
+  // Direction based on local segment
+  const dy = next[0] - prev[0];
+  const dx = next[1] - prev[1];
   const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
   const html = `
@@ -255,7 +257,7 @@ function computeTopAirport(rows) {
     iconAnchor: [7, 7]
   });
 
-  L.marker(end, { icon, interactive: false }).addTo(markerLayer);
+  L.marker(curr, { icon, interactive: false }).addTo(markerLayer);
 }
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
@@ -364,7 +366,7 @@ for (const latlngs of segments) {
 
   poly.bindPopup(popup);
 }
-      addArrowAtEnd(lastSegment, color);
+      addArrowAtMidpoint(lastSegment, color);
 
       bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
 
