@@ -105,6 +105,7 @@
   <div class="card"><div class="k">Distance (km)</div><div class="v" id="sKm">–</div></div>
   <div class="card"><div class="k">Est. hours</div><div class="v" id="sHours">–</div></div>
   <div class="card"><div class="k">Top route</div><div class="v" id="sTopRoute">–</div></div>
+        <div class="card"><div class="k">Est. days (in air)</div><div class="v" id="sDays">–</div></div>
 
   <div class="card"><div class="k">Airports visited</div><div class="v" id="sAirports">–</div></div>
   <div class="card"><div class="k">Most visited airport</div><div class="v" id="sTopAirport">–</div></div>
@@ -414,6 +415,7 @@ const rows = allRows.filter(r => {
     const km = Math.round(rows.reduce((acc, r) => acc + (r.distance_km || 0), 0));
     const mins = rows.reduce((acc, r) => acc + (r.est_duration_min || 0), 0);
     const hours = Math.round((mins / 60) * 10) / 10;
+    const days = Math.round((mins / 1440) * 10) / 10; // 1440 mins in a day
     const flags = computeCountryFlags(rows);
     const mentions = computeAirportMentions(rows, airport);
 const airportHours = Math.round((mentions * AVG_AIRPORT_HOURS_PER_MENTION) * 10) / 10;
@@ -423,6 +425,7 @@ document.getElementById('flags').textContent = flags.join(' ');
     document.getElementById('sFlights').textContent = flights ? fmt(flights) : '0';
     document.getElementById('sKm').textContent = km ? fmt(km) : '0';
     document.getElementById('sHours').textContent = hours ? fmt(hours) : '0';
+    document.getElementById('sDays').textContent = days ? fmt(days) : '0';
     document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
     document.getElementById('sAirports').textContent = fmt(computeUniqueAirports(rows));
     document.getElementById('sTopAirport').textContent = computeTopAirport(rows);
