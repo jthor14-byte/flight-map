@@ -106,6 +106,8 @@
   <div class="card"><div class="k">Est. hours</div><div class="v" id="sHours">–</div></div>
   <div class="card"><div class="k">Top route</div><div class="v" id="sTopRoute">–</div></div>
         <div class="card"><div class="k">Est. days (in air)</div><div class="v" id="sDays">–</div></div>
+        <div class="card"><div class="k">Top airline (flights)</div><div class="v" id="sTopAirlineFlights">–</div></div>
+<div class="card"><div class="k">Top airline (km)</div><div class="v" id="sTopAirlineKm">–</div></div>
 
   <div class="card"><div class="k">Airports visited</div><div class="v" id="sAirports">–</div></div>
   <div class="card"><div class="k">Most visited airport</div><div class="v" id="sTopAirport">–</div></div>
@@ -321,6 +323,33 @@ function computeCountryFlags(rows) {
     .map(iso2ToFlagEmoji)
     .filter(Boolean);
 }
+  function computeTopAirlineByFlights(rows) {
+  const counts = new Map();
+  for (const r of rows) {
+    const a = (r.airline || '').trim();
+    if (!a) continue;
+    counts.set(a, (counts.get(a) || 0) + 1);
+  }
+  let best = null, bestN = 0;
+  for (const [k, v] of counts.entries()) {
+    if (v > bestN) { best = k; bestN = v; }
+  }
+  return best ? `${best} (${bestN})` : '–';
+}
+
+function computeTopAirlineByKm(rows) {
+  const sums = new Map();
+  for (const r of rows) {
+    const a = (r.airline || '').trim();
+    if (!a) continue;
+    sums.set(a, (sums.get(a) || 0) + (r.distance_km || 0));
+  }
+  let best = null, bestKm = 0;
+  for (const [k, v] of sums.entries()) {
+    if (v > bestKm) { best = k; bestKm = v; }
+  }
+  return best ? `${best} (${Math.round(bestKm)})` : '–';
+}
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
   const loadBtn = document.getElementById('loadBtn');
@@ -421,11 +450,14 @@ const rows = allRows.filter(r => {
 const airportHours = Math.round((mentions * AVG_AIRPORT_HOURS_PER_MENTION) * 10) / 10;
 document.getElementById('sAirportHours').textContent = fmt(airportHours);
 document.getElementById('flags').textContent = flags.join(' ');
+    
 
     document.getElementById('sFlights').textContent = flights ? fmt(flights) : '0';
     document.getElementById('sKm').textContent = km ? fmt(km) : '0';
     document.getElementById('sHours').textContent = hours ? fmt(hours) : '0';
     document.getElementById('sDays').textContent = days ? fmt(days) : '0';
+    document.getElementById('sTopAirlineFlights').textContent = computeTopAirlineByFlights(rows);
+document.getElementById('sTopAirlineKm').textContent = computeTopAirlineByKm(rows);
     document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
     document.getElementById('sAirports').textContent = fmt(computeUniqueAirports(rows));
     document.getElementById('sTopAirport').textContent = computeTopAirport(rows);
