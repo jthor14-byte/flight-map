@@ -119,6 +119,10 @@
   <select id="airportSelect" disabled></select>
 </div>
       <div class="row">
+  <label>Top 5 months (distance)</label>
+  <div id="topMonths" style="font-size:12px; color:#444; line-height:1.5;">–</div>
+</div>
+      <div class="row">
   <label>Countries visited (filtered)</label>
   <div id="flags" style="font-size: 22px; line-height: 28px; word-wrap: break-word;"></div>
 </div>
@@ -441,6 +445,22 @@ function updateDistanceComparisons(totalKm) {
     worldText.textContent = `${worldLaps.toFixed(2)} laps${flag}`;
   }
 }
+  function computeTopMonthsByKm(rows, topN = 5) {
+  const sums = new Map(); // "YYYY-MM" -> km
+
+  for (const r of rows) {
+    const d = (r.date || '').trim();        // expects YYYY-MM-DD
+    const m = d.slice(0, 7);                // YYYY-MM
+    if (!/^\d{4}-\d{2}$/.test(m)) continue;
+
+    sums.set(m, (sums.get(m) || 0) + (r.distance_km || 0));
+  }
+
+  return Array.from(sums.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([month, km]) => ({ month, km }));
+}
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
   const loadBtn = document.getElementById('loadBtn');
@@ -553,6 +573,11 @@ document.getElementById('sTopAirlineKm').textContent = computeTopAirlineByKm(row
     document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
     document.getElementById('sAirports').textContent = fmt(computeUniqueAirports(rows));
     document.getElementById('sTopAirport').textContent = computeTopAirport(rows);
+    const topMonths = computeTopMonthsByKm(rows, 5);
+document.getElementById('topMonths').innerHTML =
+  topMonths.length
+    ? topMonths.map(x => `${x.month} — <b>${fmt(Math.round(x.km))}</b> km`).join('<br/>')
+    : '–';
     if (!rows.length) return;
 
     // Render routes + markers
