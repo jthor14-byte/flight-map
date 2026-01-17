@@ -229,11 +229,9 @@ function computeAirportMentions(rows, airport) {
   let mentions = 0;
   for (const r of rows) {
     if (!airport) {
-      if (r.from_iata) mentions += 1;
-      if (r.to_iata) mentions += 1;
+      if (r.from_iata) mentions += 1;               // departures only
     } else {
-      if (r.from_iata === airport) mentions += 1;
-      if (r.to_iata === airport) mentions += 1;
+      if (r.from_iata === airport) mentions += 1;   // departures only
     }
   }
   return mentions;
