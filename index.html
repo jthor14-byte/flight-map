@@ -695,32 +695,7 @@ airportSel.disabled = false;
 
   addArrowAtMidpoint(lastSegment, color);
 }
-}
-      addArrowAtMidpoint(lastSegment, color);
 
-      bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
-
-      // Markers (dedupe)
-      const fromKey = `F:${r.from_iata}:${r.from_lat}:${r.from_lng}`;
-      const toKey   = `T:${r.to_iata}:${r.to_lat}:${r.to_lng}`;
-
-      if (!airportSeen.has(fromKey)) {
-        airportSeen.add(fromKey);
-        const fromCount = airportDays.get((r.from_iata || '').toUpperCase()) || 1;
-L.circleMarker([r.from_lat, r.from_lng], { radius: radiusForVisitDays(fromCount) }).addTo(markerLayer)
-          .bindPopup(`<b>${r.from_iata || ''}</b><br/>Origin`);
-      }
-      if (!airportSeen.has(toKey)) {
-        airportSeen.add(toKey);
-     const toCount = airportDays.get((r.to_iata || '').toUpperCase()) || 1;
-L.circleMarker([r.to_lat, r.to_lng], { radius: radiusForVisitDays(toCount) }).addTo(markerLayer)
-      }
-    }
-
-    if (bounds.length) {
-      map.fitBounds(bounds, { padding: [30, 30] });
-    }
-  }
 
   function parseFlights(rawRows) {
     // Map flexible header names to expected fields
