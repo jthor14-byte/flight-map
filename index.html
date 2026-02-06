@@ -497,11 +497,11 @@ function updateDistanceComparisons(totalKm) {
 }
 
 function radiusForVisitDays(n) {
-  // bands: 1, 2–3, 4–7, 8+
-  if (n >= 8) return 9;
-  if (n >= 4) return 7;
-  if (n >= 2) return 5;
-  return 4;
+  // bands: <5, 5–10, 11–20, 21+
+  if (n >= 20) return 20;
+  if (n >= 10) return 10;
+  if (n >= 5) return 5;
+  return 2.5;
 }
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
@@ -666,26 +666,52 @@ airportSel.disabled = false;
     // Bounds always include airports
     bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
 
-    // Airport markers (dedupe) with size bands
-    const fromKey = `F:${r.from_iata}:${r.from_lat}:${r.from_lng}`;
-    const toKey   = `T:${r.to_iata}:${r.to_lat}:${r.to_lng}`;
+  // Airport markers (dedupe)
+const fromKey = `F:${r.from_iata}:${r.from_lat}:${r.from_lng}`;
+const toKey   = `T:${r.to_iata}:${r.to_lat}:${r.to_lng}`;
 
-    if (!airportSeen.has(fromKey)) {
-      airportSeen.add(fromKey);
-      const fromCount = airportDays.get((r.from_iata || '').toUpperCase()) || 1;
-      L.circleMarker([r.from_lat, r.from_lng], { radius: radiusForVisitDays(fromCount) })
-        .addTo(markerLayer)
-        .bindPopup(`<b>${r.from_iata || ''}</b><br/>Visited days: ${fromCount}`);
-    }
+// Decide radius based on mode
+const markerRadius = airportsOnly
+  ? radiusForVisitDays(
+      airportDays.get((r.from_iata || '').toUpperCase()) || 1
+    )
+  : 1;
 
-    if (!airportSeen.has(toKey)) {
-      airportSeen.add(toKey);
-      const toCount = airportDays.get((r.to_iata || '').toUpperCase()) || 1;
-      L.circleMarker([r.to_lat, r.to_lng], { radius: radiusForVisitDays(toCount) })
-        .addTo(markerLayer)
-        .bindPopup(`<b>${r.to_iata || ''}</b><br/>Visited days: ${toCount}`);
-    }
-  }
+if (!airportSeen.has(fromKey)) {
+  airportSeen.add(fromKey);
+
+  const fromCount =
+    airportDays.get((r.from_iata || '').toUpperCase()) || 1;
+
+  L.circleMarker(
+    [r.from_lat, r.from_lng],
+    { radius: airportsOnly ? radiusForVisitDays(fromCount) : 1 }
+  )
+    .addTo(markerLayer)
+    .bindPopup(
+      `<b>${r.from_iata || ''}</b>${
+        airportsOnly ? `<br/>Visited days: ${fromCount}` : ''
+      }`
+    );
+}
+
+if (!airportSeen.has(toKey)) {
+  airportSeen.add(toKey);
+
+  const toCount =
+    airportDays.get((r.to_iata || '').toUpperCase()) || 1;
+
+  L.circleMarker(
+    [r.to_lat, r.to_lng],
+    { radius: airportsOnly ? radiusForVisitDays(toCount) : 1 }
+  )
+    .addTo(markerLayer)
+    .bindPopup(
+      `<b>${r.to_iata || ''}</b>${
+        airportsOnly ? `<br/>Visited days: ${toCount}` : ''
+      }`
+    );
+}
 
   if (bounds.length) {
     map.fitBounds(bounds, { padding: [30, 30] });
