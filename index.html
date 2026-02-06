@@ -125,6 +125,15 @@
   </label>
 </div>
       <div class="row">
+  <label>Distance by year (km)</label>
+  <canvas
+    id="yearKmChart"
+    width="320"
+    height="220"
+    style="width:100%; border:1px solid #eee; border-radius:12px;"
+  ></canvas>
+</div>
+      <div class="row">
   <label>Top 5 months (distance)</label>
   <div id="topMonths" style="font-size:12px; color:#444; line-height:1.5;">–</div>
 </div>
@@ -503,6 +512,60 @@ function radiusForVisitDays(n) {
   if (n >= 5) return 5;
   return 2.5;
 }
+  function renderYearKmChart(rows) {
+  const canvas = document.getElementById('yearKmChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Sum km by year
+  const kmByYear = new Map();
+  for (const r of rows) {
+    if (!r.year) continue;
+    kmByYear.set(
+      r.year,
+      (kmByYear.get(r.year) || 0) + (r.distance_km || 0)
+    );
+  }
+
+  const years = Array.from(kmByYear.keys()).sort((a, b) => a - b);
+  if (!years.length) return;
+
+  const values = years.map(y => kmByYear.get(y));
+  const max = Math.max(...values);
+
+  const padding = 28;
+  const barHeight = 18;
+  const gap = 10;
+  const chartWidth = canvas.width - padding * 2;
+
+  ctx.font = '11px system-ui';
+  ctx.fillStyle = '#333';
+
+  years.forEach((year, i) => {
+    const value = values[i];
+    const barWidth = (value / max) * chartWidth;
+    const y =
+      padding +
+      i * (barHeight + gap);
+
+    // Year label
+    ctx.fillText(year, 6, y + barHeight - 4);
+
+    // Bar
+    ctx.fillStyle = '#4a90e2';
+    ctx.fillRect(padding, y, barWidth, barHeight);
+
+    // Value label
+    ctx.fillStyle = '#333';
+    ctx.fillText(
+      `${Math.round(value).toLocaleString()} km`,
+      padding + barWidth + 6,
+      y + barHeight - 4
+    );
+  });
+}
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
   const loadBtn = document.getElementById('loadBtn');
@@ -622,6 +685,7 @@ airportSel.disabled = false;
   document.getElementById('flags').textContent = flags.join(' ');
 
   const topMonths = computeTopMonthsByKm(rows, 5);
+    renderYearKmChart(rows);
   document.getElementById('topMonths').innerHTML =
     topMonths.length
       ? topMonths.map(x => `${x.month} — <b>${fmt(Math.round(x.km))}</b> km`).join('<br/>')
