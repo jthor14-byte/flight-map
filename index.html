@@ -512,12 +512,9 @@ function radiusForVisitDays(n) {
   if (n >= 5) return 5;
   return 2.5;
 }
-  function renderYearKmChart(rows) {
+function renderYearKmChart(rows) {
   const canvas = document.getElementById('yearKmChart');
   if (!canvas) return;
-
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Sum km by year
   const kmByYear = new Map();
@@ -535,34 +532,54 @@ function radiusForVisitDays(n) {
   const values = years.map(y => kmByYear.get(y));
   const max = Math.max(...values);
 
-  const padding = 28;
-  const barHeight = 18;
-  const gap = 10;
-  const chartWidth = canvas.width - padding * 2;
+  const ctx = canvas.getContext('2d');
 
+  // ---- layout constants ----
+  const leftLabelWidth = 46;   // space for year text
+  const rightPadding = 16;
+  const topPadding = 12;
+  const barHeight = 14;
+  const gap = 8;
+
+  // Auto-size canvas height
+  const neededHeight =
+    topPadding * 2 +
+    years.length * (barHeight + gap);
+
+  canvas.height = neededHeight;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.font = '11px system-ui';
-  ctx.fillStyle = '#333';
+  ctx.textBaseline = 'middle';
+
+  const chartWidth =
+    canvas.width - leftLabelWidth - rightPadding;
 
   years.forEach((year, i) => {
     const value = values[i];
     const barWidth = (value / max) * chartWidth;
     const y =
-      padding +
-      i * (barHeight + gap);
+      topPadding + i * (barHeight + gap);
 
     // Year label
-    ctx.fillText(year, 6, y + barHeight - 4);
+    ctx.fillStyle = '#444';
+    ctx.fillText(year, 6, y + barHeight / 2);
 
     // Bar
     ctx.fillStyle = '#4a90e2';
-    ctx.fillRect(padding, y, barWidth, barHeight);
+    ctx.fillRect(
+      leftLabelWidth,
+      y,
+      barWidth,
+      barHeight
+    );
 
     // Value label
     ctx.fillStyle = '#333';
     ctx.fillText(
       `${Math.round(value).toLocaleString()} km`,
-      padding + barWidth + 6,
-      y + barHeight - 4
+      leftLabelWidth + barWidth + 6,
+      y + barHeight / 2
     );
   });
 }
@@ -685,7 +702,7 @@ airportSel.disabled = false;
   document.getElementById('flags').textContent = flags.join(' ');
 
   const topMonths = computeTopMonthsByKm(rows, 5);
-    renderYearKmChart(rows);
+    renderYearKmChart(allRows);
   document.getElementById('topMonths').innerHTML =
     topMonths.length
       ? topMonths.map(x => `${x.month} — <b>${fmt(Math.round(x.km))}</b> km`).join('<br/>')
