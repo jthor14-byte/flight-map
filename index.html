@@ -579,104 +579,118 @@ for (const a of airports) {
 airportSel.disabled = false;
 }
   function applyFiltersAndRender() {
-    clearLayers();
-    setError('');
+  clearLayers();
+  setError('');
 
-    const y = Number(yearSel.value || 0);
-    const airline = (airlineSel.value || '').trim();
-    const airport = (airportSel.value || '').trim();
+  const y = Number(yearSel.value || 0);
+  const airline = (airlineSel.value || '').trim();
+  const airport = (airportSel.value || '').trim();
 
-const rows = allRows.filter(r => {
-  if (y && r.year !== y) return false;
-  if (airline && (r.airline || '').trim() !== airline) return false;
-  if (airport && r.from_iata !== airport && r.to_iata !== airport) return false;
-  return true;
+  const rows = allRows.filter(r => {
+    if (y && r.year !== y) return false;
+    if (airline && (r.airline || '').trim() !== airline) return false;
+    if (airport && r.from_iata !== airport && r.to_iata !== airport) return false;
+    return true;
+  });
+
   const airportsOnly = airportsOnlyToggle?.checked === true;
-const airportDays = computeAirportVisitDays(rows);
-});
-    const airportsOnly = (document.getElementById('airportsOnlyToggle')?.checked === true);
-const airportDays = computeAirportVisitDays(rows);
+  const airportDays = computeAirportVisitDays(rows);
 
-    // Stats
-    const flights = rows.length;
-    const km = Math.round(rows.reduce((acc, r) => acc + (r.distance_km || 0), 0));
-    updateDistanceComparisons(km);
-    const mins = rows.reduce((acc, r) => acc + (r.est_duration_min || 0), 0);
-    const hours = Math.round((mins / 60) * 10) / 10;
-    const days = Math.round((mins / 1440) * 10) / 10; // 1440 mins in a day
-    const flags = computeCountryFlags(rows);
-    const mentions = computeAirportMentions(rows, airport);
-const airportHours = Math.round((mentions * AVG_AIRPORT_HOURS_PER_MENTION) * 10) / 10;
-document.getElementById('sAirportHours').textContent = fmt(airportHours);
-document.getElementById('flags').textContent = flags.join(' ');
-    
+  // Stats
+  const flights = rows.length;
+  const km = Math.round(rows.reduce((acc, r) => acc + (r.distance_km || 0), 0));
+  updateDistanceComparisons(km);
 
-    document.getElementById('sFlights').textContent = flights ? fmt(flights) : '0';
-    document.getElementById('sKm').textContent = km ? fmt(km) : '0';
-    document.getElementById('sHours').textContent = hours ? fmt(hours) : '0';
-    document.getElementById('sDays').textContent = days ? fmt(days) : '0';
-    document.getElementById('sTopAirlineFlights').textContent = computeTopAirlineByFlights(rows);
-document.getElementById('sTopAirlineKm').textContent = computeTopAirlineByKm(rows);
-    document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
-    document.getElementById('sAirports').textContent = fmt(computeUniqueAirports(rows));
-    document.getElementById('sTopAirport').textContent = computeTopAirport(rows);
-    const topMonths = computeTopMonthsByKm(rows, 5);
-document.getElementById('topMonths').innerHTML =
-  topMonths.length
-    ? topMonths.map(x => `${x.month} — <b>${fmt(Math.round(x.km))}</b> km`).join('<br/>')
-    : '–';
-    if (!rows.length) return;
+  const mins = rows.reduce((acc, r) => acc + (r.est_duration_min || 0), 0);
+  const hours = Math.round((mins / 60) * 10) / 10;
+  const days = Math.round((mins / 1440) * 10) / 10;
 
-    // Render routes + markers
-    const bounds = [];
-    const airportSeen = new Set();
+  const flags = computeCountryFlags(rows);
+  const mentions = computeAirportMentions(rows, airport); // departures only (per your current logic)
+  const airportHours = Math.round((mentions * AVG_AIRPORT_HOURS_PER_MENTION) * 10) / 10;
 
-    for (const r of rows) {
-      if (r.from_lat == null || r.from_lng == null || r.to_lat == null || r.to_lng == null) continue;
+  document.getElementById('sFlights').textContent = flights ? fmt(flights) : '0';
+  document.getElementById('sKm').textContent = km ? fmt(km) : '0';
+  document.getElementById('sHours').textContent = hours ? fmt(hours) : '0';
+  document.getElementById('sDays').textContent = days ? fmt(days) : '0';
+  document.getElementById('sTopAirlineFlights').textContent = computeTopAirlineByFlights(rows);
+  document.getElementById('sTopAirlineKm').textContent = computeTopAirlineByKm(rows);
+  document.getElementById('sTopRoute').textContent = computeTopRoute(rows);
+  document.getElementById('sAirports').textContent = fmt(computeUniqueAirports(rows));
+  document.getElementById('sTopAirport').textContent = computeTopAirport(rows);
+  document.getElementById('sAirportHours').textContent = fmt(airportHours);
+  document.getElementById('flags').textContent = flags.join(' ');
 
+  const topMonths = computeTopMonthsByKm(rows, 5);
+  document.getElementById('topMonths').innerHTML =
+    topMonths.length
+      ? topMonths.map(x => `${x.month} — <b>${fmt(Math.round(x.km))}</b> km`).join('<br/>')
+      : '–';
+
+  if (!rows.length) return;
+
+  // Render
+  const bounds = [];
+  const airportSeen = new Set();
+
+  for (const r of rows) {
+    if (r.from_lat == null || r.from_lng == null || r.to_lat == null || r.to_lng == null) continue;
+
+    // Routes + arrows (only if not airports-only)
+    if (!airportsOnly) {
       const segments = greatCircleSegments(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
       const lastSegment = segments[segments.length - 1];
+      const color = getColorForAirline(r.airline);
 
-     const color = getColorForAirline(r.airline);
+      const popup = `
+        <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
+        ${r.date || ''}<br/>
+        ${r.from_iata || ''} → ${r.to_iata || ''}<br/>
+        ${r.distance_km ? `${Math.round(r.distance_km)} km` : ''} ${r.est_duration_min ? `• ~${Math.round(r.est_duration_min)} min` : ''}
+      `;
 
-const popup = `
-  <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
-  ${r.date || ''}<br/>
-  ${r.from_iata || ''} → ${r.to_iata || ''}<br/>
-  ${r.distance_km ? `${Math.round(r.distance_km)} km` : ''} ${r.est_duration_min ? `• ~${Math.round(r.est_duration_min)} min` : ''}
-`;
+      for (const latlngs of segments) {
+        const poly = L.polyline(latlngs, {
+          weight: 2,
+          opacity: 0.8,
+          noClip: true,
+          ...(color ? { color } : {})
+        }).addTo(routeLayer);
 
-for (const latlngs of segments) {
-  const poly = L.polyline(latlngs, {
-    weight: 2,
-    opacity: 0.8,
-    noClip: true,
-    ...(color ? { color } : {})
-  }).addTo(routeLayer);
+        poly.bindPopup(popup);
+      }
 
-  poly.bindPopup(popup);
-  if (!airportsOnly) {
-  const segments = greatCircleSegments(r.from_lat, r.from_lng, r.to_lat, r.to_lng);
-  const lastSegment = segments[segments.length - 1];
+      addArrowAtMidpoint(lastSegment, color);
+    }
 
-  const color = getColorForAirline(r.airline);
+    // Bounds always include airports
+    bounds.push([r.from_lat, r.from_lng], [r.to_lat, r.to_lng]);
 
-  const popup = `
-    <b>${(r.flight_no || '').toUpperCase()}</b> ${r.airline ? `(${r.airline})` : ''}<br/>
-    ${r.date || ''}<br/>
-    ${r.from_iata || ''} → ${r.to_iata || ''}<br/>
-    ${r.distance_km ? `${Math.round(r.distance_km)} km` : ''} ${r.est_duration_min ? `• ~${Math.round(r.est_duration_min)} min` : ''}
-  `;
+    // Airport markers (dedupe) with size bands
+    const fromKey = `F:${r.from_iata}:${r.from_lat}:${r.from_lng}`;
+    const toKey   = `T:${r.to_iata}:${r.to_lat}:${r.to_lng}`;
 
-  for (const latlngs of segments) {
-    const poly = L.polyline(latlngs, {
-      weight: 2,
-      opacity: 0.8,
-      noClip: true,
-      ...(color ? { color } : {})
-    }).addTo(routeLayer);
+    if (!airportSeen.has(fromKey)) {
+      airportSeen.add(fromKey);
+      const fromCount = airportDays.get((r.from_iata || '').toUpperCase()) || 1;
+      L.circleMarker([r.from_lat, r.from_lng], { radius: radiusForVisitDays(fromCount) })
+        .addTo(markerLayer)
+        .bindPopup(`<b>${r.from_iata || ''}</b><br/>Visited days: ${fromCount}`);
+    }
 
-    poly.bindPopup(popup);
+    if (!airportSeen.has(toKey)) {
+      airportSeen.add(toKey);
+      const toCount = airportDays.get((r.to_iata || '').toUpperCase()) || 1;
+      L.circleMarker([r.to_lat, r.to_lng], { radius: radiusForVisitDays(toCount) })
+        .addTo(markerLayer)
+        .bindPopup(`<b>${r.to_iata || ''}</b><br/>Visited days: ${toCount}`);
+    }
+  }
+
+  if (bounds.length) {
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
+}
   }
 
   addArrowAtMidpoint(lastSegment, color);
@@ -789,6 +803,7 @@ const to_country_code   = (obj['to_country_code'] ?? '').toString().trim().toUpp
   yearSel.addEventListener('change', applyFiltersAndRender);
   airlineSel.addEventListener('change', applyFiltersAndRender);
   airportSel.addEventListener('change', applyFiltersAndRender);
+  airportsOnlyToggle.addEventListener('change', applyFiltersAndRender);
 
   // Try loading immediately if a URL is already pasted
   // (Handy once you’ve set it up.)
