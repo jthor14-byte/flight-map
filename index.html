@@ -497,9 +497,9 @@ function updateDistanceComparisons(totalKm) {
 }
 
 function radiusForVisitDays(n) {
-  // bands: <5, 5–10, 11–20, 21+
-  if (n >= 20) return 20;
-  if (n >= 10) return 10;
+  // bands: <5, 5–20, 20–50, 50+
+  if (n >= 50) return 18;
+  if (n >= 20) return 9;
   if (n >= 5) return 5;
   return 2.5;
 }
