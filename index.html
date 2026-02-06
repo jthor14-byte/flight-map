@@ -594,6 +594,8 @@ const rows = allRows.filter(r => {
   const airportsOnly = airportsOnlyToggle?.checked === true;
 const airportDays = computeAirportVisitDays(rows);
 });
+    const airportsOnly = (document.getElementById('airportsOnlyToggle')?.checked === true);
+const airportDays = computeAirportVisitDays(rows);
 
     // Stats
     const flights = rows.length;
