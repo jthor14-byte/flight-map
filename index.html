@@ -514,7 +514,8 @@ function radiusForVisitDays(n) {
 }
 function renderYearKmChart(rows) {
   const canvas = document.getElementById('yearKmChart');
-  if (!canvas) return;
+  const tooltip = document.getElementById('yearKmTooltip');
+  if (!canvas || !tooltip) return;
 
   // Sum km by year
   const kmByYear = new Map();
@@ -534,20 +535,18 @@ function renderYearKmChart(rows) {
 
   const ctx = canvas.getContext('2d');
 
-  // ---- layout constants ----
-  const leftLabelWidth = 46;   // space for year text
-  const rightPadding = 16;
+  // ---- layout ----
+  const leftLabelWidth = 46;
+  const rightPadding = 12;
   const topPadding = 12;
   const barHeight = 14;
   const gap = 8;
 
-  // Auto-size canvas height
-  const neededHeight =
+  const height =
     topPadding * 2 +
     years.length * (barHeight + gap);
 
-  canvas.height = neededHeight;
-
+  canvas.height = height;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.font = '11px system-ui';
   ctx.textBaseline = 'middle';
@@ -555,13 +554,16 @@ function renderYearKmChart(rows) {
   const chartWidth =
     canvas.width - leftLabelWidth - rightPadding;
 
+  // Store bar hit areas for hover detection
+  const bars = [];
+
   years.forEach((year, i) => {
     const value = values[i];
     const barWidth = (value / max) * chartWidth;
     const y =
       topPadding + i * (barHeight + gap);
 
-    // Year label
+    // Label
     ctx.fillStyle = '#444';
     ctx.fillText(year, 6, y + barHeight / 2);
 
@@ -574,14 +576,43 @@ function renderYearKmChart(rows) {
       barHeight
     );
 
-    // Value label
-    ctx.fillStyle = '#333';
-    ctx.fillText(
-      `${Math.round(value).toLocaleString()} km`,
-      leftLabelWidth + barWidth + 6,
-      y + barHeight / 2
-    );
+    bars.push({
+      year,
+      value,
+      x: leftLabelWidth,
+      y,
+      w: barWidth,
+      h: barHeight
+    });
   });
+
+  // ----- Hover logic -----
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const hit = bars.find(b =>
+      mx >= b.x &&
+      mx <= b.x + b.w &&
+      my >= b.y &&
+      my <= b.y + b.h
+    );
+
+    if (hit) {
+      tooltip.style.display = 'block';
+      tooltip.textContent =
+        `${hit.year}: ${Math.round(hit.value).toLocaleString()} km`;
+      tooltip.style.left = e.clientX + 10 + 'px';
+      tooltip.style.top = e.clientY + 10 + 'px';
+    } else {
+      tooltip.style.display = 'none';
+    }
+  };
+
+  canvas.onmouseleave = () => {
+    tooltip.style.display = 'none';
+  };
 }
   // ---------- UI ----------
   const csvUrlEl = document.getElementById('csvUrl');
@@ -887,5 +918,21 @@ const to_country_code   = (obj['to_country_code'] ?? '').toString().trim().toUpp
   // Comment out if you prefer manual load.
   // loadCsv();
 </script>
+  <!-- Tooltip for year km chart -->
+<div
+  id="yearKmTooltip"
+  style="
+    position: fixed;
+    pointer-events: none;
+    background: rgba(0,0,0,0.75);
+    color: white;
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    display: none;
+    z-index: 9999;
+    white-space: nowrap;
+  ">
+</div>
 </body>
 </html>
